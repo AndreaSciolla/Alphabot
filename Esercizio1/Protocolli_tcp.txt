@@ -1,0 +1,13 @@
+RICHIESTE (client --> server):
+
+- f"{command}|{value}" 
+
+command -> forward,backward,left,right
+value -> 1 metro, 1 secondo etc..
+
+RISPOSTE (server --> client):
+
+- f"{status}|{phrase}"
+
+status -> Ok, Error
+phrase -> Comando eseguito, frase esplicativa errore

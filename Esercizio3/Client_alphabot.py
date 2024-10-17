@@ -1,63 +1,49 @@
 import socket
 from pynput import keyboard
-from threading import Thread
-import time
 
-comandi = {}
-
-
-class MyThread(Thread):
-    def __init__(self, socket):
-        super().__init__()
-        self.socket = socket
-        self.running = True
-
-    def send_command(self, comandi):
-        packet = str(comandi)
-        self.socket.sendall(packet.encode())
-
-    def stop(self):
-        self.running = False
-
-
-SERVER_ADDRESS = ("192.168.1.140", 3450)
+SERVER_ADDRESS = ("192.168.1.140", 9090)
 BUFFER_SIZE = 4096
 
-def on_press(key, t1):
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(SERVER_ADDRESS)
+
+def on_press(key):
+
     if key.char == "w":
-        comandi["F"] = "press"
-    elif key.char == "a":
-        comandi["L"] = "press"
+        print("press w")
     elif key.char == "s":
-        comandi["B"] = "press"
+        print("press s")
+    elif key.char == "a":
+        print("press a")
     elif key.char == "d":
-        comandi["R"] = "press"
-    t1.send_command(comandi)  
+        print("press d")
+    
+    s.sendall(key.char.lower().encode())
 
-def on_release(key, t1):
+def on_release(key):
+
     if key.char == "w":
-        comandi["F"] = "release"
-    elif key.char == "a":
-        comandi["L"] = "release"
+        print("release w")
     elif key.char == "s":
-        comandi["B"] = "release"
+        print("release s")
+    elif key.char == "a":
+        print("release a")
     elif key.char == "d":
-        comandi["R"] = "release"
-    t1.send_command(comandi)  
+        print("release d")
+    
+    s.sendall(key.char.upper().encode())
+    
 
-
-def start_listener(t1):
-    with keyboard.Listener(on_press=lambda key: on_press(key, t1), on_release=lambda key: on_release(key, t1)) as listener:
+def start_listener():
+    with keyboard.Listener(on_press = on_press, on_release = on_release) as listener:
         listener.join()
-
-
+    
 def main():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(SERVER_ADDRESS)
-    t1 = MyThread(s)
-    t1.start()
-    start_listener(t1)
+    start_listener()
+    while True:
+        pass
 
+    s.close()
 
 if __name__ == "__main__":
     main()

@@ -107,53 +107,41 @@ class AlphaBot(object):  # Alphabot class
             self.PWMB.ChangeDutyCycle(0 - left)
 
 
+MY_ADDRESS = ("0.0.0.0", 9090)
+BUFFER_SIZE = 4096
+
 def main():
+    alphaBot = AlphaBot()
+    alphaBot.stop()
+
     s = sck.socket(sck.AF_INET, sck.SOCK_STREAM)
-    s.bind(("0.0.0.0", 3450))  
+    s.bind(MY_ADDRESS)
     s.listen()
-    Ab = AlphaBot() 
+    
+    connection, client_address = s.accept() #bloccante
+    print(f"Il client {client_address} si è connesso")
 
-    running = True
+    while True:
+        message = connection.recv(BUFFER_SIZE)
+        direz_decode = message.decode()
 
-    connection, address = s.accept()  
-
-    while running:  
-        msg = (connection.recv(4096)).decode() 
-        diz_com = ast.literal_eval(msg)
-        print(diz_com)
-        for k in diz_com:
-            print(f"key: {k}, val: {diz_com[k]}")
-            if k == "F":
-                if diz_com[k] == "press":
-                    print("avanti")
-                    Ab.forward()  
-                else:
-                    print("fermo")
-                    
-            if k == "R":
-                if diz_com[k] == "press":
-                    print("destra")
-                    Ab.right()  
-                else:
-                    print("fermo")
-                    
-            if k == "L":
-                if diz_com[k] == "press":
-                    print("sinistra")
-                    Ab.left()  
-                else:
-                    print("fermo")
-                    
-            if k == "B":
-                if diz_com[k] == "press":
-                    print("indietro")
-                    Ab.backward()  
-                else:
-                    print("fermo")
-        Ab.stop()
-
+        if direz_decode == "w":
+            print("avanti")
+            alphaBot.forward()
+        elif direz_decode == "s":
+            print("indietro")
+            alphaBot.backward()
+        elif direz_decode == "a":
+            print("sinistra")
+            alphaBot.left()
+        elif direz_decode == "d":
+            print("destra")
+            alphaBot.right()
+        elif direz_decode.isupper():
+            print("stop")
+            alphaBot.stop()
+    
     s.close()
-
 
 if __name__ == "__main__":
     main()

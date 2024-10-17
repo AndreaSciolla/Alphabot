@@ -106,12 +106,11 @@ class AlphaBot(object):  # Alphabot class
             GPIO.output(self.IN4, GPIO.HIGH)
             self.PWMB.ChangeDutyCycle(0 - left)
 
-
-MY_ADDRESS = ("0.0.0.0", 9090)
+MY_ADDRESS = ("192.168.1.140", 9090)
 BUFFER_SIZE = 4096
 
 def main():
-    alphaBot = AlphaBot()
+    alphaBot = AlphaBot.AlphaBot()
     alphaBot.stop()
 
     s = sck.socket(sck.AF_INET, sck.SOCK_STREAM)

@@ -8,6 +8,7 @@ import socket as sck
 import threading as thr
 import time
 import RPi.GPIO as GPIO
+import ast
 
 client_list = []
 
@@ -108,41 +109,49 @@ class AlphaBot(object):  # Alphabot class
 
 def main():
     s = sck.socket(sck.AF_INET, sck.SOCK_STREAM)
-    s.bind(("0.0.0.0", 3450))  # bind of tcp server
+    s.bind(("0.0.0.0", 3450))  
     s.listen()
-    Ab = AlphaBot()  # initializing alphabot
+    Ab = AlphaBot() 
 
     running = True
 
-    connection, address = s.accept()  # client connection
+    connection, address = s.accept()  
 
-    while running:  # infinite loop
-        message = (connection.recv(4096)).decode()  # receive command
-        comando = message.split('|')[0]
-        funzione = message.split('|')[1]
-        print(f"funz: {funzione}, com: {comando}")
-        if comando == "exit":  # for closing the program
-            running = False
+    while running:  
+        msg = (connection.recv(4096)).decode() 
+        diz_com = ast.literal_eval(msg)
+        print(diz_com)
+        for k in diz_com:
+            print(f"key: {k}, val: {diz_com[k]}")
+            if k == "F":
+                if diz_com[k] == "press":
+                    print("avanti")
+                    Ab.forward()  
+                else:
+                    print("fermo")
+                    
+            if k == "R":
+                if diz_com[k] == "press":
+                    print("destra")
+                    Ab.right()  
+                else:
+                    print("fermo")
+                    
+            if k == "L":
+                if diz_com[k] == "press":
+                    print("sinistra")
+                    Ab.left()  
+                else:
+                    print("fermo")
+                    
+            if k == "B":
+                if diz_com[k] == "press":
+                    print("indietro")
+                    Ab.backward()  
+                else:
+                    print("fermo")
+        Ab.stop()
 
-            client_list.remove()
-        else:
-            while funzione == "press":
-                print("sto premendo")
-                if comando.upper().startswith("F"):  # forward
-                    print("avanzone")
-                    Ab.forward()
-
-                if comando.upper().startswith("R"):  # right
-                    Ab.right()
-
-                if comando.upper().startswith("L"):  # left
-                    Ab.left()
-
-                if comando.upper().startswith("B"):  # backward
-                    Ab.backward()
-
-            Ab.stop()
-            
     s.close()
 
 

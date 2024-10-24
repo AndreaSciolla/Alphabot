@@ -13,4 +13,7 @@ Questo repo contiene tutti gli esercizi svolti durante l'anno 2024/25 per progra
 ## -Esercizio 4:
         data: 17/10/2024
         Implementare un controllo per verificare che l'Alphabot sia connesso al pc. Se la connessione viene persa, bisogna fermare l'Alphabot, che non deve più eseguire l'ultimo comando preso in input
+## -Esercizio 5:
+        data: 24/10/2024
+        Utilizzando Sqlite creare un database con dei comandi che il server (Alphabot) deve interpretare dinamicamente. Popolare il database con movimenti utili.
 

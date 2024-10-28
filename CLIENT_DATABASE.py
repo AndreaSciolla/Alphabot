@@ -1,4 +1,4 @@
-# Data: 10-17 Ottobre 2024
+# Data: 10-17-24-28 Ottobre 2024
 # Autori: Prandi Alessandro - Sciolla Andrea
 # Descrizione: 
 # Questo  è un client TCP che si connette a un Alphabot su una specifica 

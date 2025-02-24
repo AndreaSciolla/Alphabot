@@ -10,6 +10,7 @@ app = Flask(__name__)
 
 DB_PATH = "./login.db"
 
+# Dizionario per tenere traccia dello stato dei tasti (premuto/rilasciato)
 key_state = {
     'w': False,  # Avanti
     'a': False,  # Sinistra
@@ -21,9 +22,7 @@ SECRET_KEY = "secret_key"
 ALGORITHM = "HS256"
 
 
-class AlphaBot(object):  # Classe per controllare il robot AlphaBot
-
-    # Metodo di inizializzazione, configurazione dei pin GPIO e dei motori
+class AlphaBot(object):
     def __init__(self, in1=12, in2=13, ena=6, in3=20, in4=21, enb=26):
         self.IN1 = in1
         self.IN2 = in2
@@ -34,6 +33,7 @@ class AlphaBot(object):  # Classe per controllare il robot AlphaBot
 
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
+        # Imposta i pin come output per il controllo dei motori
         GPIO.setup(self.IN1, GPIO.OUT)
         GPIO.setup(self.IN2, GPIO.OUT)
         GPIO.setup(self.IN3, GPIO.OUT)
@@ -41,15 +41,14 @@ class AlphaBot(object):  # Classe per controllare il robot AlphaBot
         GPIO.setup(self.ENA, GPIO.OUT)
         GPIO.setup(self.ENB, GPIO.OUT)
 
+        # Configura il PWM per il controllo della velocità dei motori
         self.PWMA = GPIO.PWM(self.ENA, 500)
         self.PWMB = GPIO.PWM(self.ENB, 500)
         self.PWMA.start(0)
         self.PWMB.start(0)
 
     def setMotor(self, left, right):
-        print(f"Set motor left: {left}, right: {right}")
-
-        # Controllo motore destro
+        # Controllo del motore destro
         if right >= 0:
             GPIO.output(self.IN3, GPIO.LOW)
             GPIO.output(self.IN4, GPIO.HIGH)
@@ -59,7 +58,7 @@ class AlphaBot(object):  # Classe per controllare il robot AlphaBot
             GPIO.output(self.IN4, GPIO.LOW)
             self.PWMB.ChangeDutyCycle(abs(right))
 
-        # Controllo motore sinistro
+        # Controllo del motore sinistro
         if left >= 0:
             GPIO.output(self.IN1, GPIO.HIGH)
             GPIO.output(self.IN2, GPIO.LOW)
@@ -78,6 +77,10 @@ bot = AlphaBot()
 
 
 def get_db_connection():
+    """
+    Crea e restituisce una connessione al database SQLite.
+    Utilizza row_factory per poter accedere alle righe come dizionari.
+    """
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row  # Abilita l'accesso alle righe come dizionario
@@ -88,24 +91,25 @@ def get_db_connection():
 
 
 def hash_password(password):
+    #Crea un hash SHA256 della password per memorizzarla in modo sicuro.
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 
 def generate_token(username):
-    """Genera un token JWT valido per 1 giorno."""
+    #Genera un token JWT contenente lo username e una data di scadenza di 1 giorno.
     payload = {
         "username": username,
         "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1)
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-    # jwt.encode in PyJWT >= 2.0 restituisce una stringa; in versioni precedenti potrebbe restituire un byte string.
+    
     if isinstance(token, bytes):
         token = token.decode('utf-8')
     return token
 
 
 def verify_token(token):
-    """Verifica il token JWT. Restituisce il payload se valido, altrimenti None."""
+    #Verifica la validità del token JWT.
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
@@ -120,9 +124,8 @@ def control_alphabot():
     """
     Valuta lo stato dei tasti e invia il comando appropriato al robot.
     Utilizza il metodo setMotor per controllare i motori.
-    I valori dei motori sono esemplificativi e possono essere regolati.
     """
-    # Combinazioni di due tasti:
+    # Combinazioni di due tasti
     if key_state['w'] and key_state['d']:
         print("Comando: Avanti-Destra")
         bot.setMotor(60, 40)
@@ -135,7 +138,8 @@ def control_alphabot():
     elif key_state['s'] and key_state['a']:
         print("Comando: Indietro-Sinistra")
         bot.setMotor(-40, -60)
-    # Comandi singoli:
+        
+    # Comandi singoli
     elif key_state['w']:
         print("Comando: Avanti")
         bot.setMotor(60, 60)
@@ -180,10 +184,8 @@ def login():
             # Genera il token JWT al momento del login
             token = generate_token(username)
             response = make_response(redirect(url_for('index')))
-            # Imposta nei cookie sia il nome utente che il token
-            response.set_cookie('username', username,
-                                max_age=60 * 60 * 24)  # 1 giorno
-            response.set_cookie('token', token, max_age=60 * 60 * 24)
+            # Imposta il cookie del token (contiene anche lo username)
+            response.set_cookie('token', token, max_age=60 * 60 * 24)  # 1 giorno
             print(f"Token generato: {token}")
             return response
         else:
@@ -222,23 +224,30 @@ def create_account():
 @app.route('/logout', methods=['POST'])
 def logout():
     response = make_response(redirect(url_for('login')))
-    response.delete_cookie('username')
     response.delete_cookie('token')
     return response
 
 
 @app.route('/')
 def index():
-    username = request.cookies.get('username')
-    if username:
-        return render_template('index.html', username=username)
+    """
+    Pagina principale.
+    Recupera il token dal cookie, lo verifica e utilizza lo username contenuto nel payload.
+    Se il token non è valido o assente, reindirizza al login.
+    """
+    token = request.cookies.get('token')
+    if token:
+        payload = verify_token(token)
+        if payload:
+            username = payload.get("username")
+            return render_template('index.html', username=username)
     return redirect(url_for('login'))
 
 
 @app.route("/key_event", methods=['POST'])
 def key_event():
     """
-    Questa rotta riceve eventi dei tasti (premuto/rilasciato) dal client.
+    Riceve gli eventi dei tasti (premuto/rilasciato) dal client.
     Aggiorna il dizionario key_state e richiama control_alphabot() per controllare il robot.
     """
     data = request.json
@@ -259,10 +268,7 @@ def key_event():
 
 @app.route("/token_info", methods=['GET'])
 def token_info():
-    """
-    Recupera il token dai cookie, lo verifica e stampa sia il token che il payload.
-    Questa route è utile per il debug o per mostrare le informazioni del token.
-    """
+    #Mostra le informazioni del token.
     token = request.cookies.get('token')
     if not token:
         return jsonify({"message": "Token non trovato!"}), 400
@@ -278,4 +284,5 @@ def token_info():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host='192.168.1.140')
+    robot = "192.168.1.140"
+    app.run(debug=True, host=robot)

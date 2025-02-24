@@ -3,7 +3,6 @@ import sqlite3
 import hashlib
 import jwt
 import datetime
-from functools import wraps
 import RPi.GPIO as GPIO  # Libreria per controllare i GPIO del Raspberry Pi
 
 app = Flask(__name__)
@@ -77,13 +76,8 @@ bot = AlphaBot()
 
 
 def get_db_connection():
-    """
-    Crea e restituisce una connessione al database SQLite.
-    Utilizza row_factory per poter accedere alle righe come dizionari.
-    """
     try:
         conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row  # Abilita l'accesso alle righe come dizionario
         return conn
     except sqlite3.Error as e:
         print(f"Errore durante la connessione al database: {e}")
@@ -91,12 +85,12 @@ def get_db_connection():
 
 
 def hash_password(password):
-    #Crea un hash SHA256 della password per memorizzarla in modo sicuro.
+    """Crea un hash SHA256 della password per memorizzarla in modo sicuro."""
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 
 def generate_token(username):
-    #Genera un token JWT contenente lo username e una data di scadenza di 1 giorno.
+    """Genera un token JWT contenente lo username e una data di scadenza di 1 giorno"""
     payload = {
         "username": username,
         "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1)
@@ -109,7 +103,7 @@ def generate_token(username):
 
 
 def verify_token(token):
-    #Verifica la validità del token JWT.
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
@@ -121,11 +115,8 @@ def verify_token(token):
 
 
 def control_alphabot():
-    """
-    Valuta lo stato dei tasti e invia il comando appropriato al robot.
-    Utilizza il metodo setMotor per controllare i motori.
-    """
-    # Combinazioni di due tasti
+
+    # Combinazioni di due tasti:
     if key_state['w'] and key_state['d']:
         print("Comando: Avanti-Destra")
         bot.setMotor(60, 40)
@@ -138,8 +129,7 @@ def control_alphabot():
     elif key_state['s'] and key_state['a']:
         print("Comando: Indietro-Sinistra")
         bot.setMotor(-40, -60)
-        
-    # Comandi singoli
+    # Comandi singoli:
     elif key_state['w']:
         print("Comando: Avanti")
         bot.setMotor(60, 60)
@@ -159,6 +149,11 @@ def control_alphabot():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    """
+    Gestisce la pagina di login.
+    In caso di POST, verifica le credenziali e genera un token JWT.
+    Viene impostato solo il cookie del token, poiché contiene già lo username.
+    """
     if request.method == 'POST':
         username = request.form.get('e-mail')
         password = request.form.get('password')
@@ -174,17 +169,18 @@ def login():
             WHERE username = ? AND password = ?
         """
 
-        with get_db_connection() as conn:
-            if conn:
-                cur = conn.cursor()
-                cur.execute(query_login, (username, password_hash))
-                user = cur.fetchone()
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            cur.execute(query_login, (username, password_hash))
+            user = cur.fetchone()
+            conn.close()
 
         if user:
             # Genera il token JWT al momento del login
             token = generate_token(username)
             response = make_response(redirect(url_for('index')))
-            # Imposta il cookie del token (contiene anche lo username)
+            # Imposta solo il cookie del token (contiene anche lo username)
             response.set_cookie('token', token, max_age=60 * 60 * 24)  # 1 giorno
             print(f"Token generato: {token}")
             return response
@@ -195,6 +191,7 @@ def login():
 
 @app.route('/create_account', methods=['GET', 'POST'])
 def create_account():
+    
     if request.method == 'POST':
         username = request.form.get('e-mail')
         password = request.form.get('password')
@@ -209,20 +206,23 @@ def create_account():
             VALUES (?, ?)
         """
 
-        with get_db_connection() as conn:
-            if conn:
-                cur = conn.cursor()
-                try:
-                    cur.execute(query_insert, (username, password_hash))
-                    conn.commit()
-                    return redirect(url_for('login'))
-                except sqlite3.IntegrityError:
-                    return render_template('create_account.html', alert="Username già esistente!")
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            try:
+                cur.execute(query_insert, (username, password_hash))
+                conn.commit()
+                conn.close()
+                return redirect(url_for('login'))
+            except sqlite3.IntegrityError:
+                conn.close()
+                return render_template('create_account.html', alert="Username già esistente!")
     return render_template('create_account.html')
 
 
 @app.route('/logout', methods=['POST'])
 def logout():
+    """Gestisce il logout cancellando il cookie del token"""
     response = make_response(redirect(url_for('login')))
     response.delete_cookie('token')
     return response
@@ -230,11 +230,6 @@ def logout():
 
 @app.route('/')
 def index():
-    """
-    Pagina principale.
-    Recupera il token dal cookie, lo verifica e utilizza lo username contenuto nel payload.
-    Se il token non è valido o assente, reindirizza al login.
-    """
     token = request.cookies.get('token')
     if token:
         payload = verify_token(token)
@@ -268,7 +263,7 @@ def key_event():
 
 @app.route("/token_info", methods=['GET'])
 def token_info():
-    #Mostra le informazioni del token.
+    """Mostra le informazioni del token"""
     token = request.cookies.get('token')
     if not token:
         return jsonify({"message": "Token non trovato!"}), 400

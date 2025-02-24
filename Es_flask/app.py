@@ -240,5 +240,4 @@ def token_info():
 
 if __name__ == "__main__":
     robot = "0.0.0.0"
-    print(f"Server avviato su http://{robot}:5000")
     app.run(debug=True, host=robot)

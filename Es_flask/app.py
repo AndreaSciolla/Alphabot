@@ -9,17 +9,8 @@ app = Flask(__name__)
 
 DB_PATH = "./login.db"
 
-# Dizionario per tenere traccia dello stato dei tasti (premuto/rilasciato)
-key_state = {
-    'w': False,  # Avanti
-    'a': False,  # Sinistra
-    's': False,  # Indietro
-    'd': False   # Destra
-}
-
 SECRET_KEY = "secret_key"
 ALGORITHM = "HS256"
-
 
 class AlphaBot(object):
     def __init__(self, in1=12, in2=13, ena=6, in3=20, in4=21, enb=26):
@@ -70,10 +61,8 @@ class AlphaBot(object):
     def stop(self):
         self.setMotor(0, 0)
 
-
 # Istanza globale del robot
 bot = AlphaBot()
-
 
 def get_db_connection():
     try:
@@ -83,11 +72,9 @@ def get_db_connection():
         print(f"Errore durante la connessione al database: {e}")
         return None
 
-
 def hash_password(password):
     """Crea un hash SHA256 della password per memorizzarla in modo sicuro."""
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
-
 
 def generate_token(username):
     """Genera un token JWT contenente lo username e una data di scadenza di 1 giorno"""
@@ -101,9 +88,7 @@ def generate_token(username):
         token = token.decode('utf-8')
     return token
 
-
 def verify_token(token):
-
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
@@ -113,39 +98,31 @@ def verify_token(token):
         print("Token non valido.")
     return None
 
+def control_alphabot(key, state):
+    """
+    Controlla il robot in base al tasto ricevuto e al suo stato.
+    Se il tasto viene rilasciato (state=False), ferma il robot.
+    """
+    if not state:
+        print("Comando: Stop")
+        bot.stop()
+        return
 
-def control_alphabot():
-
-    # Combinazioni di due tasti:
-    if key_state['w'] and key_state['d']:
-        print("Comando: Avanti-Destra")
-        bot.setMotor(60, 40)
-    elif key_state['w'] and key_state['a']:
-        print("Comando: Avanti-Sinistra")
-        bot.setMotor(40, 60)
-    elif key_state['s'] and key_state['d']:
-        print("Comando: Indietro-Destra")
-        bot.setMotor(-60, -40)
-    elif key_state['s'] and key_state['a']:
-        print("Comando: Indietro-Sinistra")
-        bot.setMotor(-40, -60)
-    # Comandi singoli:
-    elif key_state['w']:
+    if key == 'w':
         print("Comando: Avanti")
         bot.setMotor(60, 60)
-    elif key_state['s']:
+    elif key == 's':
         print("Comando: Indietro")
         bot.setMotor(-60, -60)
-    elif key_state['d']:
+    elif key == 'd':
         print("Comando: Destra")
         bot.setMotor(60, 20)
-    elif key_state['a']:
+    elif key == 'a':
         print("Comando: Sinistra")
         bot.setMotor(20, 60)
     else:
         print("Comando: Stop")
         bot.stop()
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -177,21 +154,17 @@ def login():
             conn.close()
 
         if user:
-            # Genera il token JWT al momento del login
             token = generate_token(username)
             response = make_response(redirect(url_for('index')))
-            # Imposta solo il cookie del token (contiene anche lo username)
-            response.set_cookie('token', token, max_age=60 * 60 * 24)  # 1 giorno
+            response.set_cookie('token', token, max_age=60 * 60 * 24)
             print(f"Token generato: {token}")
             return response
         else:
             return render_template('login.html', alert="Credenziali non valide!")
     return render_template('login.html')
 
-
 @app.route('/create_account', methods=['GET', 'POST'])
 def create_account():
-    
     if request.method == 'POST':
         username = request.form.get('e-mail')
         password = request.form.get('password')
@@ -219,14 +192,12 @@ def create_account():
                 return render_template('create_account.html', alert="Username già esistente!")
     return render_template('create_account.html')
 
-
 @app.route('/logout', methods=['POST'])
 def logout():
     """Gestisce il logout cancellando il cookie del token"""
     response = make_response(redirect(url_for('login')))
     response.delete_cookie('token')
     return response
-
 
 @app.route('/')
 def index():
@@ -238,28 +209,18 @@ def index():
             return render_template('index.html', username=username)
     return redirect(url_for('login'))
 
-
 @app.route("/key_event", methods=['POST'])
 def key_event():
     """
     Riceve gli eventi dei tasti (premuto/rilasciato) dal client.
-    Aggiorna il dizionario key_state e richiama control_alphabot() per controllare il robot.
+    Passa il tasto e lo stato a control_alphabot per controllare il robot.
     """
     data = request.json
     key = data.get('key')
     state = data.get('state')  # True = premuto, False = rilasciato
 
-    if key in key_state:
-        key_state[key] = state
-        if state:
-            print(f"Tasto premuto: {key}")
-        else:
-            print(f"Tasto rilasciato: {key}")
-        # Dopo l'aggiornamento dello stato, controlla il robot
-        control_alphabot()
-        return jsonify({"success": True}), 200
-    return jsonify({"success": False}), 400
-
+    control_alphabot(key, state)
+    return jsonify({"success": True}), 200
 
 @app.route("/token_info", methods=['GET'])
 def token_info():
@@ -277,7 +238,7 @@ def token_info():
         "payload": payload
     }), 200
 
-
 if __name__ == "__main__":
-    robot = "192.168.1.140"
+    robot = "0.0.0.0"
+    print(f"Server avviato su http://{robot}:5000")
     app.run(debug=True, host=robot)
